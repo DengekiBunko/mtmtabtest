@@ -39,7 +39,7 @@ return [
             // 数据库连接参数：这是连接 TiDB Cloud 的关键核心
             'params'          => [
                 // 开启 SSL 连接，配合 Dockerfile 中的 ca-certificates 使用系统证书池
-                \PDO::MYSQL_ATTR_SSL_CA => true,
+                \PDO::MYSQL_ATTR_SSL_CA => '/etc/ssl/certs/ca-certificates.crt',
                 // 设置为 false 以兼容云环境，无需手动更新 .pem 文件，长期有效不失效
                 \PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
             ],
