@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     ca-certificates \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 PHP 编译依赖
@@ -24,14 +25,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 PHP 扩展 - 第一阶段：数据库
-RUN docker-php-ext-install -j$(nproc) pdo_mysql mysqli
+RUN docker-php-ext-install pdo_mysql mysqli
 
 # 安装 PHP 扩展 - 第二阶段：图形和压缩 (合并 configure 和 install)
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd zip
+    && docker-php-ext-install gd zip
 
 # 安装 PHP 扩展 - 第三阶段：数学和进程
-RUN docker-php-ext-install -j$(nproc) bcmath pcntl
+RUN docker-php-ext-install bcmath pcntl
 
 # 安装 Redis 扩展
 RUN pecl install redis && docker-php-ext-enable redis
