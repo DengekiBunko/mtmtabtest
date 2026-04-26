@@ -125,12 +125,14 @@ class Index extends BaseController
                 return $this->success($info);
             }
         } catch (\Exception $e) {
-            print_r($e);
+            // 授权服务器连接失败时，使用本地授权状态，不影响页面显示
         }
+        // 授权服务器连接失败时，返回本地授权状态，不返回错误信息
         $info['remote'] = [
-            "auth" => (bool)$this->authCode
+            "auth" => (bool)$this->authCode,
+            "msg" => "本地模式"
         ];
-        return $this->success('授权服务器连接失败', $info);
+        return $this->success($info);
     }
 
 

@@ -5,6 +5,7 @@ use think\facade\Route;
 Route::any('/index/all', "index/all");
 Route::any('/manager', 'index/index');
 Route::any("/privacy", "index/privacy");
+Route::any("/about", "index/about");
 Route::any('/noteApp', "index/index");
 Route::any("/api/background$", "api/background");
 Route::any("/qq_login$", "user/qq_login");
