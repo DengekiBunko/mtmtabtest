@@ -4,14 +4,10 @@
 # =====================================================
 FROM php:8.2-fpm
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
+# 安装基础运行时工具
+RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     redis-server \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype-dev \
-    libzip-dev \
     unzip \
     git \
     curl \
@@ -19,23 +15,26 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 配置GD库
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+# 安装 PHP 编译依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype-dev \
+    libzip-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 安装PHP扩展
-RUN docker-php-ext-install \
-    pdo \
-    pdo_mysql \
-    mysqli \
-    gd \
-    zip \
-    bcmath \
-    opcache \
-    mbstring \
-    xml \
-    json \
-    ctype \
-    session
+# 安装 PHP 扩展 - 第一阶段：数据库
+RUN docker-php-ext-install -j$(nproc) pdo_mysql mysqli
+
+# 安装 PHP 扩展 - 第二阶段：图形和压缩 (合并 configure 和 install)
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) gd zip
+
+# 安装 PHP 扩展 - 第三阶段：数学和进程
+RUN docker-php-ext-install -j$(nproc) bcmath pcntl
+
+# 安装 Redis 扩展
+RUN pecl install redis && docker-php-ext-enable redis
 
 # 安装 Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
