@@ -243,42 +243,38 @@ function createDbConnection($host, $port, $user, $password, $database, $sslCaPem
         if (!file_exists($sslCaFile) || file_get_contents($sslCaFile) !== $sslCaPem) {
             file_put_contents($sslCaFile, $sslCaPem);
         }
+    } else {
+        // 使用系统证书池
+        $sslCaFile = '/etc/ssl/certs/ca-certificates.crt';
     }
     
-    // 使用PDO进行连接（更好的SSL支持）
-    try {
-        $dsn = "mysql:host={$host};port={$port}";
-        if ($database) {
-            $dsn .= ";dbname={$database}";
-        }
-        $dsn .= ";charset=utf8mb4";
-        
-        $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 30,
-        ];
-        
-        // TiDB Cloud强制要求SSL
-        if ($sslCaFile && file_exists($sslCaFile)) {
-            $options[PDO::MYSQL_ATTR_SSL_CA] = $sslCaFile;
-        } else {
-            // 使用系统证书池
-            $options[PDO::MYSQL_ATTR_SSL_CA] = '/etc/ssl/certs/ca-certificates.crt';
-        }
-        
-        // 禁用服务器证书验证（自动续期兼容）
-        $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-        
-        $pdo = new PDO($dsn, $user, $password, $options);
-        
-        // 返回mysqli连接（兼容现有代码）
-        return new mysqli($host, $user, $password, $database ?: null, $port);
-        
-    } catch (PDOException $e) {
-        // 回退到mysqli
-        $conn = @new mysqli($host, $user, $password, $database ?: null, $port);
-        return $conn;
+    // 使用mysqli进行连接
+    $conn = mysqli_init();
+    if (!$conn) {
+        return null;
     }
+
+    // 禁用服务器证书验证（自动续期兼容）
+    mysqli_options($conn, MYSQLI_OPT_SSL_VERIFY_SERVER_CERT, false);
+
+    // 设置SSL CA
+    if ($sslCaFile && file_exists($sslCaFile)) {
+        mysqli_ssl_set($conn, null, null, $sslCaFile, null, null);
+    }
+
+    // 尝试连接
+    @mysqli_real_connect(
+        $conn, 
+        $host, 
+        $user, 
+        $password, 
+        $database ?: null, 
+        $port, 
+        null, 
+        MYSQLI_CLIENT_SSL
+    );
+    
+    return $conn;
 }
 
 /**
