@@ -1,0 +1,58 @@
+# =====================================================
+# mTab Hugging Face Spaces Dockerfile
+# 基于 Ubuntu 的标准 HF Spaces 镜像
+# =====================================================
+FROM python:3.11-slim
+
+# 安装系统依赖和 PHP
+RUN apt-get update && apt-get install -y \
+    nginx \
+    php8.2-fpm \
+    php8.2-mysql \
+    php8.2-gd \
+    php8.2-mbstring \
+    php8.2-xml \
+    php8.2-curl \
+    php8.2-zip \
+    php8.2-bcmath \
+    php8.2-opcache \
+    redis-server \
+    git \
+    curl \
+    ca-certificates \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制应用代码
+COPY . /app
+
+# 安装 PHP 依赖
+RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# 配置 PHP
+COPY docker/php.ini /etc/php/8.2/fpm/php.ini
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/default.conf /etc/nginx/http.d/default.conf
+
+# 创建必要目录
+RUN mkdir -p /run/php /var/www/html /app/runtime /app/public/static /app/public/images && \
+    chmod -R 755 /app
+
+# 复制启动脚本
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# 暴露端口 (Hugging Face Spaces 使用 7860)
+EXPOSE 7860
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:7860/ || exit 1
+
+# 启动命令
+CMD ["/bin/bash", "/start.sh"]

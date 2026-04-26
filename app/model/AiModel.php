@@ -2,57 +2,33 @@
 
 namespace app\model;
 
+use app\extend\SnowFlake;
 use think\Model;
 
-/**
- *
- */
 class AiModel extends Model
 {
     protected $name = "ai";
     protected $pk = "id";
-
+    protected $autoWriteTimestamp = "datetime";
+    protected $createTime = "create_time";
+    
     /**
-     * @param int $user_id 用户id
-     * @param string $role 角色
-     * @param string $message 消息
-     * @param int $dialogue_id 对话id
-     * @param string $reasoning_content 深度思考内哦让给你
-     * @return AiModel|Model
-     * @noinspection PhpMissingParamTypeInspection
+     * 创建AI对话消息
+     * 使用雪花ID替代自增ID
      */
-    static function addMessage($user_id, $role, $message, $dialogue_id, $reasoning_content = "")
+    public static function addMessage($userId, $dialogueId, $role, $message, $aiId = '', $reasoningContent = '')
     {
-        if (!$role) {
-            $role = 'user';
-        }
-        return self::create(['user_id' => $user_id, 'message' => $message, 'role' => $role, 'dialogue_id' => $dialogue_id, 'reasoning_content' => $reasoning_content]);
+        $snowflake = SnowFlake::getInstance(1);
+        $data = [
+            'id' => $snowflake->nextId(),
+            'user_id' => $userId,
+            'dialogue_id' => $dialogueId,
+            'role' => $role,
+            'message' => $message,
+            'ai_id' => $aiId,
+            'reasoning_content' => $reasoningContent,
+            'create_time' => date('Y-m-d H:i:s'),
+        ];
+        return self::create($data);
     }
-
-    static function history($user_id, $dialogue_id): array
-    {
-        $list = self::where('user_id', $user_id)->where('dialogue_id', $dialogue_id)->field("role,message as content")->select()->toArray();
-        $content = [];
-        $countList = count($list);
-        for ($i = 0; $i < $countList; $i++) {
-            $value = $list[$i];
-            if ($value['role'] === "user") {
-                $content[] = $value;
-                // 检查是否需要补充 assistant
-                if ($i + 1 < $countList && $list[$i + 1]['role'] !== 'assistant') {
-                    $content[] = ["role" => "assistant", "content" => ""];
-                }
-            } else {
-                // 如果第一条不是 user，则跳过
-                if ($i === 0) continue;
-                $content[] = $value;
-            }
-        }
-        // 确保最后一条是 assistant
-        if (!empty($content) && $content[count($content) - 1]['role'] === 'user') {
-            $content[] = ["role" => "assistant", "content" => ""];
-        }
-        return $content;
-    }
-
 }

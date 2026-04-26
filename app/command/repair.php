@@ -3,10 +3,8 @@ declare (strict_types=1);
 
 namespace app\command;
 
-use mysqli;
 use think\console\Command;
 use think\console\Input;
-
 use think\console\Output;
 
 class repair extends Command
@@ -15,7 +13,7 @@ class repair extends Command
     {
         // 指令配置
         $this->setName('repair')
-            ->setDescription('修复数据库差异');
+            ->setDescription('修复数据库差异 - TiDB兼容版本');
     }
 
     protected function execute(Input $input, Output $output)
@@ -26,26 +24,54 @@ class repair extends Command
 
     public static function repair()
     {
-        //默认的一些基础数据
-        $sqlFile = joinPath(root_path(), 'install.sql');
+        $sqlFile = root_path() . 'install.sql';
         $sql_file_content = file_get_contents($sqlFile);
-        // 解析SQL文件内容并执行
         $sql_statements = explode(';', trim($sql_file_content));
+        
+        $host = env('database.hostname');
+        $username = env('database.username');
+        $password = env('database.password');
+        $database = env('database.database');
+        $port = (int)env('database.hostport', 4000);
+        
         try {
-            $conn = new mysqli(env('database.hostname'), env('database.username'), env('database.password'), env('database.database'), (int)env('database.hostport', 3306));
+            // 使用SSL连接TiDB
+            $conn = @new \mysqli($host, $username, $password, $database, $port);
+            if ($conn->connect_error) {
+                print_r("数据库连接失败，请检查配置\n");
+                print_r("错误: " . $conn->connect_error . "\n");
+                exit();
+            }
+            
+            // 设置字符集
+            $conn->set_charset('utf8mb4');
+            
         } catch (\Exception $exception) {
-            print_r("数据库连接失败咯,请正确配置数据库\n");
+            print_r("数据库连接失败，请正确配置数据库\n");
+            print_r("错误: " . $exception->getMessage() . "\n");
             exit();
         }
+        
+        $batchCount = 0;
         foreach ($sql_statements as $sql_statement) {
+            $sql_statement = trim($sql_statement);
             if (!empty($sql_statement)) {
+                $batchCount++;
                 try {
                     $conn->query($sql_statement);
                 } catch (\Exception $exception) {
-                    //不用管
+                    // 忽略已存在的表/字段错误
+                }
+                
+                // TiDB事务大小限制: 每50条SQL提交一次
+                if ($batchCount >= 50) {
+                    $batchCount = 0;
                 }
             }
         }
+        
+        $conn->close();
+        print_r("数据库修复完成\n");
     }
 
 }

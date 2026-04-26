@@ -1,32 +1,35 @@
 <?php
-/*
- * @description:
- * @Date: 2022-09-26 20:27:01
- * @LastEditTime: 2022-09-26 20:27:53
- */
 
 namespace app\model;
 
+use app\extend\SnowFlake;
 use think\Model;
 
 class LinkFolderModel extends Model
 {
-    protected $pk = 'id';
-    protected $name = 'link_folder';
-
-    function setGroupIdsAttr($val): string
+    protected $name = "link_folder";
+    protected $pk = "id";
+    protected $autoWriteTimestamp = "datetime";
+    protected $createTime = "create_time";
+    
+    /**
+     * 获取雪花ID
+     * @return int
+     */
+    public static function getSnowflakeId(): int
     {
-        if (count($val) > 0) {
-            return join(',', $val);
-        }
-        return '0';
+        return SnowFlake::getInstance(6)->nextId();
     }
-
-    function getGroupIdsAttr($val): array
+    
+    /**
+     * 创建文件夹
+     * 使用雪花ID替代自增ID
+     */
+    public static function createFolder($data)
     {
-        if (strlen($val)) {
-            return array_map('intval', explode(',', $val));
+        if (!isset($data['id'])) {
+            $data['id'] = self::getSnowflakeId();
         }
-        return [];
+        return self::create($data);
     }
 }

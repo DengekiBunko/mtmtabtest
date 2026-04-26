@@ -1,29 +1,70 @@
-FROM alpine:3.13
-LABEL describe="tushan-mtab"
-LABEL author="tushan<itushan@mtab.cc>"
+# =====================================================
+# mTab Dockerfile - Hugging Face Spaces 优化版本
+# 支持 TiDB Cloud SSL 连接
+# =====================================================
+FROM php:8.2-fpm
 
-WORKDIR /
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    nginx \
+    redis-server \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype-dev \
+    libzip-dev \
+    unzip \
+    git \
+    curl \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY ./docker/install.sh /install.sh
-COPY ./docker/start.sh /start.sh
-COPY ./docker/nginx.conf /nginx.conf
-COPY ./docker/default.conf /default.conf
-COPY ./docker/www.conf /www.conf
-COPY ./docker/redis.conf /opt/redis.conf
-COPY ./docker/php.ini /php.ini
+# 配置GD库
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
 
-COPY . /www
+# 安装PHP扩展
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    mysqli \
+    gd \
+    zip \
+    bcmath \
+    opcache \
+    mbstring \
+    xml \
+    json \
+    ctype \
+    session
 
-#ENV SYSTEM_TYPE='Synology'
+# 安装 Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-RUN chmod +x /install.sh && chmod +x /start.sh && /bin/sh /install.sh && rm /install.sh
+# 设置工作目录
+WORKDIR /app
 
+# 复制应用代码
+COPY . /app
 
-EXPOSE 80
+# 安装依赖
+RUN composer install --no-dev --optimize-autoloader
 
-CMD ["/bin/bash","/start.sh"]
+# 配置nginx
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/default.conf /etc/nginx/http.d/default.conf
 
+# 创建必要目录
+RUN mkdir -p /run/nginx /var/www/html /app/runtime /app/public/static
 
-#构建全平台 docker buildx create --name mybuilder --driver docker-container --use
-#构建全平台 docker buildx build --no-cache --platform linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/amd64/v3 -t itushan/mtab --push .
-#构建本地镜像 docker build -t itushan/mtab .
+# 设置权限
+RUN chown -R www-data:www-data /app
+
+# 复制启动脚本
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# 暴露端口
+EXPOSE 7860
+
+# 启动命令
+CMD ["/bin/bash", "/start.sh"]

@@ -23,14 +23,16 @@ class Link extends BaseController
                 if (is_array($link)) {
                     $is = LinkModel::where("user_id", $user['user_id'])->find();
                     if ($is) {
-                        HistoryModel::create(['user_id' => $user['user_id'], 'link' => $is['link'], 'create_time' => date("Y-m-d H:i:s")]); //历史记录备份,用于用户误操作恢复用途
+                        // 使用雪花ID创建历史记录
+                        HistoryModel::createHistory($user['user_id'], $is['link']);
+                        
                         $ids = HistoryModel::where("user_id", $user['user_id'])->order("id", 'desc')->limit(10)->select()->toArray();
                         $ids = array_column($ids, "id");
                         HistoryModel::where("user_id", $user['user_id'])->whereNotIn("id", $ids)->delete();
                         $is->link = $link;
                         $is->save();
                     } else {
-                        LinkModel::create(["user_id" => $user['user_id'], "link" => $link]);
+                        LinkModel::createLink($user['user_id'], $link);
                     }
                     Cache::delete("Link.{$user['user_id']}");
                     return $this->success('ok');
@@ -84,7 +86,13 @@ class Link extends BaseController
             if ($res) {
                 $link = $res['link'];
                 Cache::delete("Link.{$user['user_id']}");
-                LinkModel::update(["user_id" => $user['user_id'], "link" => $link]);
+                $linkModel = LinkModel::where("user_id", $user['user_id'])->find();
+                if ($linkModel) {
+                    $linkModel->link = $link;
+                    $linkModel->save();
+                } else {
+                    LinkModel::createLink($user['user_id'], $link);
+                }
                 return $this->success('ok');
             }
         }
@@ -95,20 +103,20 @@ class Link extends BaseController
     {
         $user = $this->getUser();
         if ($user) {
-            $data = LinkModel::find($user['user_id']);
+            $data = LinkModel::where('user_id', $user['user_id'])->find();
             if ($data) {
                 Cache::delete("Link.{$user['user_id']}");
                 $data->delete();
             }
-            $data = TabbarModel::find($user['user_id']);
+            $data = TabbarModel::where('user_id', $user['user_id'])->find();
             if ($data) {
                 $data->delete();
             }
-            $data = ConfigModel::find($user['user_id']);
+            $data = ConfigModel::where('user_id', $user['user_id'])->find();
             if ($data) {
                 $data->delete();
             }
-            $data = UserSearchEngineModel::find($user['user_id']);
+            $data = UserSearchEngineModel::where('user_id', $user['user_id'])->find();
             if ($data) {
                 $data->delete();
             }

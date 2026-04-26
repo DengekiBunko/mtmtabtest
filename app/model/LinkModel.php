@@ -2,11 +2,12 @@
 /*
  * @description:
  * @Date: 2022-09-26 20:27:01
- * @LastEditTime: 2022-09-26 20:27:53
+ * @LastEditTime: 2024-04-24 (Modified for TiDB Snowflake ID)
  */
 
 namespace app\model;
 
+use app\extend\SnowFlake;
 use think\facade\Cache;
 use think\Model;
 
@@ -34,12 +35,10 @@ class LinkModel extends Model
     {
         foreach ($value as $k => &$v) {
             if (isset($v['app']) && $v['app'] == 1) {
-                //如果存在app，并且id>0,且type为icon，则从app中获取数据
                 if (isset($v['origin_id']) && $v['origin_id'] > 0 && $v['type'] === 'icon') {
                     $origin_id = (int)$v['origin_id'];
                     if (isset($this->WebApp[$origin_id])) {
                         $webApp = $this->WebApp[$origin_id];
-                        //替换掉app数据
                         $v['custom'] = $webApp['custom'];
                         if (isset($v['custom']['height'])) {
                             $v['custom']['height'] = (int)$v['custom']['height'];
@@ -56,6 +55,15 @@ class LinkModel extends Model
             }
         }
         return (array)$value;
+    }
+
+    /**
+     * 获取雪花ID
+     * @return int
+     */
+    public static function getSnowflakeId(): int
+    {
+        return SnowFlake::getInstance(7)->nextId();
     }
 
     static function getLink($user)
@@ -85,5 +93,20 @@ class LinkModel extends Model
             }
         }
         return [];
+    }
+    
+    /**
+     * 创建用户书签记录
+     * 使用雪花ID替代自增ID
+     */
+    public static function createLink($userId, $link)
+    {
+        $snowflake = SnowFlake::getInstance(7);
+        return self::create([
+            'id' => $snowflake->nextId(),
+            'user_id' => $userId,
+            'link' => $link,
+            'update_time' => date('Y-m-d H:i:s'),
+        ]);
     }
 }

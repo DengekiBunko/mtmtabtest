@@ -49,6 +49,8 @@ class AiModel extends BaseController
         if (isset($data['id']) && $data['id'] > 0) {
             AiModelModel::update($data);
         } else {
+            // 使用雪花ID创建模型
+            $data['id'] = AiModelModel::getSnowflakeId();
             AiModelModel::create($data);
         }
         return $this->success("ok");
