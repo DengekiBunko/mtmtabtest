@@ -36,7 +36,7 @@ class Index extends BaseController
         }
         View::assign("customHead", $customHead);
         View::assign("favicon", SettingModel::Config('favicon', SettingModel::Config('logo', '/favicon.ico')));
-        return View::fetch("dist/index.html");
+        return View::fetch(joinPath(public_path(), "/dist/index.html"));
     }
 
     function all(): \think\response\Json

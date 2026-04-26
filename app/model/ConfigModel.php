@@ -34,4 +34,16 @@ class ConfigModel extends Model
         }
         return $config;
     }
+
+    public static function getConfigs($user)
+    {
+        if (!$user) {
+            return false;
+        }
+        $info = self::where('user_id', $user['user_id'])->find();
+        if ($info) {
+            return json_decode($info['config'], true);
+        }
+        return false;
+    }
 }
