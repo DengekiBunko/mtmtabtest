@@ -75,7 +75,17 @@ class Index extends BaseController
     function about(): string
     {
         $content = $this->systemSetting("about", "");
-        return View::fetch('/privacy', ['content' => $content, 'title' => $this->systemSetting("title", '') . ' - 关于我们', 'logo' => $this->systemSetting('logo', '')]);
+        
+        // 如果没有设置 about 内容，使用默认内容
+        if (empty($content)) {
+            $content = '<h2>关于我们</h2><p>mTab 是一款现代化的浏览器新标签页应用，帮助您高效管理书签、记录和待办事项。</p>';
+        }
+        
+        return View::fetch('/privacy', [
+            'content' => $content, 
+            'title' => $this->systemSetting("title", 'mTab') . ' - 关于我们', 
+            'logo' => $this->systemSetting('logo', '/static/mtab.png')
+        ]);
     }
 
     function favicon()

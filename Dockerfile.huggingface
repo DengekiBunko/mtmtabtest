@@ -1,11 +1,15 @@
 # =====================================================
 # mTab Hugging Face Spaces Dockerfile
-# 基于 Ubuntu 的标准 HF Spaces 镜像
+# 基于 Ubuntu 的标准 HF Spaces 镜像 - 优化版避免卡住
 # =====================================================
 FROM python:3.11-slim
 
-# 安装系统依赖和 PHP
-RUN apt-get update && apt-get install -y \
+# 设置非交互模式，避免安装过程卡住
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+# 安装系统依赖和 PHP（使用 --no-install-recommends 减少体积）
+RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
     php8.2-fpm \
     php8.2-mysql \
@@ -29,21 +33,27 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # 设置工作目录
 WORKDIR /app
 
-# 复制应用代码
+# 复制 composer 文件先安装依赖（利用 Docker 缓存）
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# 复制应用代码（排除不必要的文件）
 COPY . /app
 
-# 安装 PHP 依赖
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# 安装剩余的 PHP 依赖
+RUN composer dump-autoload --optimize
 
-# 配置 PHP
+# 配置 PHP 和 Nginx
 COPY docker/php.ini /etc/php/8.2/fpm/php.ini
 COPY docker/www.conf /etc/php/8.2/fpm/pool.d/www.conf
 COPY docker/nginx.conf /etc/nginx/nginx.conf
-COPY docker/default.conf /etc/nginx/http.d/default.conf
+COPY docker/default.conf /etc/nginx/sites-enabled/default
 
-# 创建必要目录
-RUN mkdir -p /run/php /var/www/html /app/runtime /app/public/static /app/public/images && \
-    chmod -R 755 /app
+# 创建必要目录并设置权限
+RUN mkdir -p /run/php /var/log/nginx /app/runtime /app/runtime/log /app/public/static /app/public/images && \
+    chmod -R 755 /app && \
+    chmod -R 777 /app/runtime && \
+    touch /app/public/installed.lock
 
 # 复制启动脚本
 COPY docker/start.sh /start.sh
@@ -52,8 +62,10 @@ RUN chmod +x /start.sh
 # 暴露端口 (Hugging Face Spaces 使用 7860)
 EXPOSE 7860
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:7860/ || exit 1
+# 健康检查（简化版，避免卡住）
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://localhost:7860/ || exit 1
 
-# 启动命令
+# 启动命令（使用优化版启动脚本）
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
 CMD ["/bin/bash", "/start.sh"]
