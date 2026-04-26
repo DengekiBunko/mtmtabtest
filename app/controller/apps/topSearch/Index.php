@@ -58,6 +58,12 @@ class Index extends PluginsBase
                 return $this->douyin();
             case 'toutiao':
                 return $this->toutiao();
+            case 'sohu':
+                return $this->sohu();
+            case 'tencent':
+                return $this->tencent();
+            case 'all':
+                return $this->all();
         }
         return $this->error('not type');
     }
@@ -269,6 +275,80 @@ class Index extends PluginsBase
         return $this->success($arr);
     }
 
+    public function sohu(): \think\response\Json
+    {
+        try {
+            $c = Cache::get('sohuTopSearch');
+            if ($c) {
+                return $this->success('cache', $c);
+            }
+        } catch (ErrorException $e) {
+
+        }
+        $result = \Axios::http()->request('get', 'https://news.sohu.com/api/hot/item/list');
+        $result = $result->getBody()->getContents();
+        $result = json_decode($result, true);
+        $arr = [];
+        if (isset($result['data'])) {
+            foreach ($result['data'] as $v) {
+                $arr[] = [
+                    'title' => $v['name'],
+                    'hot' => $v['hotCount'],
+                    'url' => $v['link']
+                ];
+            }
+            Cache::set('sohuTopSearch', $arr, $this->ttl);
+        }
+        return $this->success($arr);
+    }
+
+    public function tencent(): \think\response\Json
+    {
+        try {
+            $c = Cache::get('tencentTopSearch');
+            if ($c) {
+                return $this->success('cache', $c);
+            }
+        } catch (ErrorException $e) {
+
+        }
+        $result = \Axios::http()->request('get', 'https://r.qq.com/api/whatsnew/get_hot_list');
+        $result = $result->getBody()->getContents();
+        $result = json_decode($result, true);
+        $arr = [];
+        if (isset($result['detail'])) {
+            foreach ($result['detail'] as $v) {
+                $arr[] = [
+                    'title' => $v['title'],
+                    'hot' => $v['hotVal'],
+                    'url' => $v['url']
+                ];
+            }
+            Cache::set('tencentTopSearch', $arr, $this->ttl);
+        }
+        return $this->success($arr);
+    }
+
+    public function all(): \think\response\Json
+    {
+        $sources = [
+            'baidu' => 'baiduTopSearch',
+            'bilibili' => 'bilibili',
+            'weibo' => 'weibo',
+            'zhiHu' => 'zhiHu',
+            'douyin' => 'douyin',
+            'toutiao' => 'toutiao',
+            'sohu' => 'sohu',
+            'tencent' => 'tencent'
+        ];
+        $allData = [];
+        foreach ($sources as $key => $method) {
+            $res = $this->$method();
+            $allData[$key] = $res->getData()['data'];
+        }
+        return $this->success($allData);
+    }
+
     public function clearRedisCache(): \think\response\Json
     {
         Cache::delete('bilibiliTopSearch');
@@ -276,6 +356,9 @@ class Index extends PluginsBase
         Cache::delete('weiboTopSearch');
         Cache::delete('zhiHuTopSearch');
         Cache::delete('douyinTopSearch');
+        Cache::delete('toutiaoTopSearch');
+        Cache::delete('sohuTopSearch');
+        Cache::delete('tencentTopSearch');
         return $this->success('刷新完毕');
     }
 }
