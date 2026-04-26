@@ -163,7 +163,7 @@
       "size": "1x1",
       "sort": 31,
       "type": "icon",
-      "bgColor": "#fff",
+      "bgColor": "rgba(255,255,255,1)",
       "pageGroup": ""
     },
     {
@@ -177,6 +177,20 @@
       "sort": 33,
       "type": "icon",
       "bgColor": "rgba(100,159,252,1)",
+      "pageGroup": "",
+      "form": "link"
+    },
+    {
+      "id": "TOP-SEARCH-001",
+      "app": 1,
+      "pid": null,
+      "src": "/static/app/topSearch/ico.png",
+      "url": "/plugins/topSearch/card",
+      "name": "热搜",
+      "size": "1x1",
+      "sort": 30,
+      "type": "icon",
+      "bgColor": "rgba(255, 87, 34, 1)",
       "pageGroup": "",
       "form": "link"
     },

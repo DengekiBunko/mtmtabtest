@@ -335,18 +335,12 @@ CREATE INDEX ai_model_user_id_index ON ai_model (user_id);
 -- 默认数据插入 (使用 INSERT IGNORE 避免重复插入)
 -- =====================================================
 
--- 插入卡片数据
+-- 插入卡片数据 (保留免费组件，移除付费模块)
 INSERT IGNORE INTO card (id, name, name_en, status, version, tips, src, url, `window`) VALUES
-(1001, '今天吃什么', 'food', 1, 3, '吃什么是个很麻烦的事情', '/plugins/food/static/ico.png', '/plugins/food/card', '/plugins/food/window'),
-(1002, '天气', 'weather', 1, 13, '获取您所在地的实时天气！', '/plugins/weather/static/ico.png', '/plugins/weather/card', '/plugins/weather/window'),
-(1003, '电子木鱼', 'muyu', 1, 5, '木鱼一敲 烦恼丢掉', '/plugins/muyu/static/ico.png', '/plugins/muyu/card', '/plugins/muyu/window'),
-(1004, '热搜', 'topSearch', 1, 15, '聚合百度，哔站，微博，知乎，头条等热搜！', '/plugins/topSearch/static/ico.png', '/plugins/topSearch/card', '/plugins/topSearch/window'),
+(1002, '天气日历', 'weather', 1, 13, '获取您所在地的实时天气和日历信息！', '/plugins/weather/static/ico.png', '/plugins/weather/card', '/plugins/weather/window'),
+(1004, '热搜', 'topSearch', 1, 15, '聚合百度，哔站，微博，知乎，头条等热搜！管理员可设置RSS源', '/plugins/topSearch/static/ico.png', '/plugins/topSearch/card', '/plugins/topSearch/window'),
 (1005, '记事本', 'noteApp', 1, 15, '快捷记录您的灵感', '/plugins/noteApp/static/ico.png', '/plugins/noteApp/card', '/noteApp'),
-(1006, '每日诗词', 'poetry', 1, 8, '精选每日诗词！', '/plugins/poetry/static/ico.png', '/plugins/poetry/card', '/plugins/poetry/window'),
 (1007, '日历', 'calendar', 1, 1, '日历', '/plugins/calendar/static/ico.png', '/plugins/calendar/card', '/plugins/calendar/window'),
 (1008, '待办事项', 'todo', 1, 8, '快捷添加待办事项', '/plugins/todo/static/ico.png', '/plugins/todo/card', '/plugins/todo/window'),
 (1009, '倒计时', 'countdown', 1, 8, '个性化自定义事件的倒计时组件', '/plugins/countdown/static/ico.png', '/plugins/countdown/card', '/plugins/countdown/window'),
-(1010, '纪念日', 'commemorate', 1, 8, '个性化自定义事件的纪念日组件', '/plugins/commemorate/static/ico.png', '/plugins/commemorate/card', '/plugins/commemorate/window'),
-(1011, 'AI助手', 'ai', 1, 1, '您的随身AI助手', '/plugins/ai/static/ico.png', '/plugins/ai/card', '/plugins/ai/window'),
-(1012, '图片格式转换', 'imageConversion', 1, 1, '批量将图片格式转为JPEG,PNG,WEBP等格式', '/plugins/imageConversion/static/ico.png', '/plugins/imageConversion/card', '/plugins/imageConversion/window'),
-(1013, '金额换算', 'amountConversion', 1, 1, '将金额转为大写', '/static/app/amountConversion/ico.svg', '/plugins/amountConversion/card', '/plugins/amountConversion/window');
+(1010, '纪念日', 'commemorate', 1, 8, '个性化自定义事件的纪念日组件', '/plugins/commemorate/static/ico.png', '/plugins/commemorate/card', '/plugins/commemorate/window');

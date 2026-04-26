@@ -19,6 +19,94 @@ class Index extends PluginsBase
         }
     }
 
+    function calendar(): \think\response\Json
+    {
+        // 获取当前日期信息
+        $today = date('Y-m-d');
+        $year = date('Y');
+        $month = date('m');
+        $day = date('d');
+        $weekday = date('w');
+        $lunar = $this->getLunarDate($year, $month, $day);
+        
+        $calendarInfo = [
+            'date' => $today,
+            'year' => $year,
+            'month' => $month,
+            'day' => $day,
+            'weekday' => $weekday,
+            'weekday_name' => ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][$weekday],
+            'lunar' => $lunar,
+            'solar_terms' => $this->getSolarTerms($month, $day),
+            'holidays' => $this->getHolidays($today),
+            'is_weekend' => in_array($weekday, [0, 6])
+        ];
+        
+        return $this->success('ok', $calendarInfo);
+    }
+
+    private function getLunarDate($year, $month, $day)
+    {
+        // 简化的农历计算，实际项目中应使用专门的农历库
+        $lunarMonths = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'];
+        $lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十', 
+                     '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                     '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+        
+        // 这里使用简化算法，实际应该使用准确的农历转换
+        $lunarMonth = $lunarMonths[($month - 1) % 12];
+        $lunarDay = $lunarDays[($day - 1) % 30];
+        
+        return [
+            'month' => $lunarMonth,
+            'day' => $lunarDay,
+            'full_date' => $lunarMonth . $lunarDay
+        ];
+    }
+
+    private function getSolarTerms($month, $day)
+    {
+        $solarTerms = [
+            1 => ['小寒', '大寒'],
+            2 => ['立春', '雨水'],
+            3 => ['惊蛰', '春分'],
+            4 => ['清明', '谷雨'],
+            5 => ['立夏', '小满'],
+            6 => ['芒种', '夏至'],
+            7 => ['小暑', '大暑'],
+            8 => ['立秋', '处暑'],
+            9 => ['白露', '秋分'],
+            10 => ['寒露', '霜降'],
+            11 => ['立冬', '小雪'],
+            12 => ['大雪', '冬至']
+        ];
+        
+        if (isset($solarTerms[$month])) {
+            $terms = $solarTerms[$month];
+            return $terms[$day <= 15 ? 0 : 1] ?? '';
+        }
+        
+        return '';
+    }
+
+    private function getHolidays($date)
+    {
+        // 简化的节假日判断
+        $holidays = [
+            '01-01' => '元旦',
+            '02-14' => '情人节',
+            '03-08' => '妇女节',
+            '04-01' => '愚人节',
+            '05-01' => '劳动节',
+            '06-01' => '儿童节',
+            '10-01' => '国庆节',
+            '12-25' => '圣诞节'
+        ];
+        
+        $monthDay = date('m-d', strtotime($date));
+        return $holidays[$monthDay] ?? '';
+    }
+
     function ip(): \think\response\Json
     {
         $ip = getRealIp();
