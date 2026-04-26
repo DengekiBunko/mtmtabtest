@@ -43,7 +43,20 @@ class TabbarModel extends Model
         }
         $info = self::where('user_id', $user['user_id'])->find();
         if ($info) {
-            return json_decode($info['tabs'], true);
+            $tabs = json_decode($info['tabs'], true);
+            if (is_array($tabs)) {
+                // 去重处理：根据id去重，保留第一个出现的
+                $seen = [];
+                $uniqueTabs = [];
+                foreach ($tabs as $tab) {
+                    $tabId = is_array($tab) ? ($tab['id'] ?? uniqid()) : $tab;
+                    if (!isset($seen[$tabId])) {
+                        $seen[$tabId] = true;
+                        $uniqueTabs[] = $tab;
+                    }
+                }
+                return $uniqueTabs;
+            }
         }
         return false;
     }

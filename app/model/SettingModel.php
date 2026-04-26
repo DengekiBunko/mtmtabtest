@@ -46,7 +46,8 @@ class SettingModel extends Model
 
     public static function siteConfig()
     {
-        $keys = ['title', 'keywords', 'description', 'logo', 'favicon', 'footer', 'customHead', 'pwa', 'register', 'login', 'upload_size', 'upload_ext', 'version'];
+        // 移除了 footer 字段（备案信息）
+        $keys = ['title', 'keywords', 'description', 'logo', 'favicon', 'customHead', 'pwa', 'register', 'login', 'upload_size', 'upload_ext', 'version'];
         $config = [];
         foreach ($keys as $key) {
             $config[$key] = self::Config($key);

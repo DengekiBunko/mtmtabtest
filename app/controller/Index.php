@@ -72,6 +72,12 @@ class Index extends BaseController
         return View::fetch('/privacy', ['content' => $content, 'title' => $this->systemSetting("title", ''), 'logo' => $this->systemSetting('logo', '')]);
     }
 
+    function about(): string
+    {
+        $content = $this->systemSetting("about", "");
+        return View::fetch('/privacy', ['content' => $content, 'title' => $this->systemSetting("title", '') . ' - 关于我们', 'logo' => $this->systemSetting('logo', '')]);
+    }
+
     function favicon()
     {
         //从配置中获取logo
