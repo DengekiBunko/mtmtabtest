@@ -1,8 +1,14 @@
 <?php
 /*
- * @description: 适配 Hugging Face 与 TiDB Cloud SSL 的数据库配置文件
+ * @description: TiDB Cloud SSL 兼容数据库配置
  * @Date: 2022-09-26 17:52:37
  * @LastEditTime: 2024-04-24 (Modified for TiDB Cloud SSL)
+ * 
+ * TiDB兼容性说明:
+ * 1. 强制启用SSL连接 - TiDB Cloud要求SSL
+ * 2. 字符集统一使用 utf8mb4_general_ci
+ * 3. 启用断线重连 - 云数据库网络波动时保持连接
+ * 4. 使用雪花ID替代自增ID - TiDB自增ID在多并发下不是严格递增的
  */
 return [
     // 默认使用的数据库连接配置
@@ -25,27 +31,29 @@ return [
         'mysql' => [
             // 数据库类型
             'type'            => env('database.type', 'mysql'),
-            // 服务器地址 (由 start.sh 注入的环境变量)
+            // 服务器地址 (TiDB Cloud 地址)
             'hostname'        => env('database.hostname', '127.0.0.1'),
             // 数据库名
-            'database'        => env('database.database', ''),
+            'database'        => env('database.database', 'mtab'),
             // 用户名
             'username'        => env('database.username', 'root'),
             // 密码
             'password'        => env('database.password', ''),
-            // 端口 (TiDB 默认为 4000)
+            // 端口 (TiDB 默认 4000)
             'hostport'        => env('database.hostport', '4000'),
             
-            // 数据库连接参数：这是连接 TiDB Cloud 的关键核心
+            // TiDB Cloud SSL连接参数 - 关键配置
             'params'          => [
-                // 开启 SSL 连接，配合 Dockerfile 中的 ca-certificates 使用系统证书池
+                // 强制SSL连接 - TiDB Cloud要求
                 \PDO::MYSQL_ATTR_SSL_CA => '/etc/ssl/certs/ca-certificates.crt',
-                // 设置为 false 以兼容云环境，无需手动更新 .pem 文件，长期有效不失效
+                // 禁用服务器证书验证 - 兼容云环境，自动续期不失效
                 \PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+                // 设置连接超时时间
+                \PDO::ATTR_TIMEOUT => 30,
             ],
             
-            // 数据库编码默认采用utf8
-            'charset'         => env('database.charset', 'utf8mb4'),
+            // 字符集 - TiDB兼容utf8mb4_general_ci
+            'charset'         => 'utf8mb4',
             // 数据库表前缀
             'prefix'          => env('database.prefix', ''),
 
@@ -59,12 +67,14 @@ return [
             'slave_no'        => '',
             // 是否严格检查字段是否存在
             'fields_strict'   => true,
-            // 【建议开启】是否需要断线重连 (云数据库连接由于网络波动容易断开，开启后更稳定)
+            // 【重要】断线重连 - 云数据库连接由于网络波动容易断开
             'break_reconnect' => true,
             // 监听SQL
             'trigger_sql'     => env('database.debug', false),
             // 开启字段缓存
             'fields_cache'    => false,
+            // SQL执行超时时间(秒)
+            'timeout'         => 30,
         ],
     ],
 ];

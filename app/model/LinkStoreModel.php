@@ -1,39 +1,43 @@
 <?php
 
-/*
- * @description:
- * @Date: 2022-09-26 20:27:01
- * @LastEditTime: 2022-09-26 20:27:53
- */
-
 namespace app\model;
 
+use app\extend\SnowFlake;
 use think\Model;
 
 class LinkStoreModel extends Model
 {
     protected $name = "linkstore";
     protected $pk = "id";
-    protected $jsonAssoc = true;
-    protected $json = ['custom'];
-
-    function userInfo(): \think\model\relation\HasOne
+    protected $autoWriteTimestamp = "datetime";
+    protected $createTime = "create_time";
+    
+    /**
+     * 获取雪花ID
+     * @return int
+     */
+    public static function getSnowflakeId(): int
     {
-        return $this->hasOne(UserModel::class, 'id', 'user_id')->field('id,nickname');
+        return SnowFlake::getInstance(8)->nextId();
     }
-    function setGroupIdsAttr($val): string
+    
+    /**
+     * 创建链接记录
+     * 使用雪花ID替代自增ID
+     */
+    public static function createLinkStore($data)
     {
-        if (count($val) > 0) {
-            return join(',', $val);
+        if (!isset($data['id'])) {
+            $data['id'] = self::getSnowflakeId();
         }
-        return '0';
+        return self::create($data);
     }
-
-    function getGroupIdsAttr($val): array
+    
+    /**
+     * 增加安装数量
+     */
+    public static function incrementInstall($id)
     {
-        if (strlen($val)) {
-            return array_map('intval', explode(',', $val));
-        }
-        return [];
+        return self::where('id', $id)->inc('install_num')->update();
     }
 }

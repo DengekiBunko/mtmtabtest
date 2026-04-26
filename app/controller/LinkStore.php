@@ -24,12 +24,10 @@ class LinkStore extends BaseController
 
         $list = LinkStoreModel::where($sql)->where('status', 1)->withoutField('user_id');
 
-        // 使用 find_in_set 匹配 area
         if ($area && $area != 0) {
             $list = $list->whereRaw('find_in_set(?,area)', [$area]);
         }
 
-        // 将两个 whereOrRaw 条件组合在一起
         $list = $list->where(function ($query) use ($user) {
             $query->whereRaw('find_in_set(0,group_ids)');
             if ($user) {
@@ -55,7 +53,6 @@ class LinkStore extends BaseController
             $sql[] = ['name|tips', 'like', '%' . $name . '%'];
         }
         $list = LinkStoreModel::with(['userInfo'])->where($sql);
-        //area需要使用find_in_set来匹配
         if ($area && $area != '全部') {
             $list = $list->whereRaw("find_in_set(?,area)", [$area]);
         }
@@ -110,7 +107,9 @@ class LinkStore extends BaseController
         if (isset($info['id'])) {
             unset($info['id']);
         }
-        (new \app\model\LinkStoreModel)->allowField(["name", "src", "url", "domain", "create_time", "tips", "app"])->insert($info);
+        // 使用雪花ID创建记录
+        $info['id'] = LinkStoreModel::getSnowflakeId();
+        (new \app\model\LinkStoreModel)->insert($info);
         return $this->success('添加成功', $info);
     }
 
@@ -159,7 +158,7 @@ class LinkStore extends BaseController
             $info['status'] = 0;
             $info['create_time'] = date('Y-m-d H:i:s');
             if (!LinkStoreModel::where("url", $info['url'])->find()) {
-                LinkStoreModel::create($info);
+                LinkStoreModel::createLinkStore($info);
                 return $this->success('推送完毕');
             }
         }
@@ -190,11 +189,12 @@ class LinkStore extends BaseController
             } catch (\Exception $exception) {
 
             }
-            if (isset($data['id']) && $data['id']) { //更新
+            if (isset($data['id']) && $data['id']) {
                 return $this->update();
             } else {
                 $data['create_time'] = date("Y-m-d H:i:s");
-                $info = (new \app\model\LinkStoreModel)->create($data);
+                // 使用雪花ID创建记录
+                $info = LinkStoreModel::createLinkStore($data);
                 return $this->success('添加成功', $info);
             }
         }
@@ -224,8 +224,7 @@ class LinkStore extends BaseController
     function install_num(): \think\response\Json
     {
         $id = $this->request->post('id', false);
-        //给标签+=1
-        $res = Db::table("linkstore")->where('id', $id)->inc('install_num')->update();
+        $res = LinkStoreModel::incrementInstall($id);
         if ($res) {
             return $this->success('ok');
         }
@@ -244,8 +243,8 @@ class LinkStore extends BaseController
                 $model = LinkFolderModel::find($id);
                 $model->update($form);
             } else {
-                $model = new LinkFolderModel();
-                $model->create($form);
+                // 使用雪花ID创建文件夹
+                LinkFolderModel::createFolder($form);
             }
         } else if ($type === 'del') {
             $id = $this->request->post('id');

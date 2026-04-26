@@ -16,7 +16,8 @@ class Ai extends BaseController
     {
         $user = $this->getUser(true);
         $model = $this->request->post("model", '');
-        $add = DialogueModel::create(["user_id" => $user->user_id, "mode_id" => $model]);
+        // 使用雪花ID创建对话
+        $add = DialogueModel::createDialogue($user['user_id'], '', $model);
         return $this->success("ok", ['id' => $add['id'], "create_time" => $add['create_time'], 'title' => ""]);
     }
 
@@ -100,12 +101,13 @@ class Ai extends BaseController
             'Accept: application/json',
             'Content-Type: application/json'
         ];
-        $dialogue = DialogueModel::where('user_id', $user->user_id)->where('id', $dialogue_id)->find();
+        $dialogue = DialogueModel::where('user_id', $user['user_id'])->where('id', $dialogue_id)->find();
         if (!$dialogue) {
             return $this->error('对话不存在');
         }
-        $historyMessages = AiModel::history($user->user_id, $dialogue_id);
-        AiModel::addMessage($user->user_id, 'user', $input, $dialogue_id);
+        $historyMessages = AiModel::history($user['user_id'], $dialogue_id);
+        // 使用雪花ID创建消息
+        AiModel::addMessage($user['user_id'], $dialogue_id, 'user', $input);
         if (!$dialogue->title || $dialogue->model_id !== $model_id) {
             //取出前30个当前消息的内容，并取前30个字符，作为对话标题
             if (!$dialogue->title) {
@@ -186,7 +188,8 @@ class Ai extends BaseController
         if (curl_errno($ch)) {
             echo json_encode(['code' => 0, "msg" => "服务开小差了~~~ 请稍后再尝试！"]);
         } else {
-            AiModel::addMessage($user->user_id, 'assistant', $str, $dialogue_id, $reasoning_content);
+            // 使用雪花ID创建AI消息
+            AiModel::addMessage($user['user_id'], $dialogue_id, 'assistant', $str, '', $reasoning_content);
         }
         // 关闭cURL资源
         curl_close($ch);

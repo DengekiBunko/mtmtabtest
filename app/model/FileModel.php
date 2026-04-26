@@ -2,12 +2,22 @@
 
 namespace app\model;
 
+use app\extend\SnowFlake;
 use think\Model;
 
 class FileModel extends Model
 {
     protected $name = "file";
     protected $pk = "id";
+
+    /**
+     * 获取雪花ID
+     * @return int
+     */
+    public static function getSnowflakeId(): int
+    {
+        return SnowFlake::getInstance(4)->nextId();
+    }
 
     function getPathAttr($value)
     {
@@ -20,11 +30,9 @@ class FileModel extends Model
         $hash = hash_file('md5', $originPath);
         $find = self::where('hash', $hash)->find();
         if ($find) {
-            //如果文件不存在，就删除记录
             if (!file_exists(joinPath(public_path(), $find['path']))) {
                 $find->delete();
             } else {
-                //存在就返回数据库的路径
                 if ($find['path'] !== $file) {
                     unlink($originPath);
                 }
@@ -34,6 +42,7 @@ class FileModel extends Model
         if (file_exists($originPath)) {
             clearstatcache(true, $originPath);
             $info = [];
+            $info["id"] = self::getSnowflakeId();
             $info["path"] = $file;
             $info["user_id"] = $user_id;
             $info['create_time'] = date("Y-m-d H:i:s");

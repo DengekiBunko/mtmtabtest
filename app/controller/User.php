@@ -12,6 +12,7 @@ use app\model\SettingModel;
 use app\model\TokenModel;
 use app\model\UserGroupModel;
 use app\model\UserModel;
+use app\extend\SnowFlake;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use think\db\exception\DataNotFoundException;
@@ -67,7 +68,7 @@ class User extends BaseController
         $auth = $this->refreshToken($info);
         $info->login_ip = getRealIp();
         $info->login_time = date('Y-m-d H:i:s');
-        $info->login_fail_count = 0; //登陆成功将失败次数归零
+        $info->login_fail_count = 0;
         $info->save();
         return $this->success('登录成功', $auth);
     }
@@ -82,7 +83,14 @@ class User extends BaseController
         if (isset($info['access_token'])) {
             $auth['access_token'] = $info['access_token'];
         }
-        TokenModel::insert($auth);
+        TokenModel::insert([
+            'id' => TokenModel::getSnowflakeId(),
+            'user_id' => $info['id'],
+            'token' => $token,
+            'create_time' => time(),
+            'ip' => getRealIp(),
+            'user_agent' => $agent,
+        ]);
         unset($auth['user_agent']);
         unset($auth['access_token']);
         unset($auth['ip']);
@@ -107,7 +115,6 @@ class User extends BaseController
                 return $this->error('密码过短');
             }
             if ($this->systemSetting("auth_check", '0', true) === '0') {
-                // 验证码验证
                 $cacheCode = Cache::get('code' . $user);
                 if (!$cacheCode || $cacheCode != $code) {
                     return $this->error('验证码错误');
@@ -116,7 +123,15 @@ class User extends BaseController
             if (UserModel::where('mail', $user)->field('id,mail')->find()) {
                 return $this->error('账号已存在');
             }
-            $add = UserModel::insert(['mail' => $user, 'password' => md5($pass), 'create_time' => date('Y-m-d H:i:s'), 'register_ip' => getRealIp(), 'group_id' => $this->getDefaultUserGroupId()]);
+            // 使用雪花ID创建用户
+            $add = UserModel::create([
+                'id' => UserModel::getSnowflakeId(),
+                'mail' => $user,
+                'password' => md5($pass),
+                'create_time' => date('Y-m-d H:i:s'),
+                'register_ip' => getRealIp(),
+                'group_id' => $this->getDefaultUserGroupId(),
+            ]);
             if ($add) {
                 Cache::delete('code' . $user);
                 return $this->success('ok');
@@ -150,7 +165,6 @@ class User extends BaseController
                     return $this->error('验证码错误');
                 }
             } else if ($this->systemSetting("auth_check", '0', true) === '1') {
-                //不验证邮件验证码
                 if (!$oldPass || md5($oldPass) != $info['password']) {
                     return $this->error('旧密码错误');
                 }
@@ -158,7 +172,7 @@ class User extends BaseController
             $info->password = md5($pass);
             $add = $info->save();
             if ($add) {
-                TokenModel::where('user_id', $info['id'])->delete(); //删除所有登录记录
+                TokenModel::where('user_id', $info['id'])->delete();
                 Cache::delete('login.' . $user);
                 return $this->success('ok');
             }
@@ -265,7 +279,6 @@ class User extends BaseController
         $info = $this->getUser(true);
         $field = $this->request->post('field', false);
         $value = $this->request->post('value', false);
-        //允许修改的字段
         $allow = ['nickname', 'avatar'];
         if ($info && $field && $value && in_array($field, $allow)) {
             UserModel::where('id', $info['user_id'])->update([$field => $value]);
@@ -298,7 +311,6 @@ class User extends BaseController
         $code = $this->request->get('code', false);
         $state = $this->request->get('state');
         if (strpos($state, 'bind')) {
-            //绑定模式
             $this->qq_bind_mode = true;
         }
         $callback = 'https://' . $this->request->host(true) . '/qq_login';
@@ -323,7 +335,6 @@ class User extends BaseController
         return View::fetch('/qq_login_error');
     }
 
-    //此方法禁止网络访问
     private function getOpenId($access_token): string
     {
         $result = \Axios::http()->get('https://graph.qq.com/oauth2.0/me', [
@@ -338,23 +349,30 @@ class User extends BaseController
             if (isset($js['openid'])) {
                 $openid = $js['openid'];
                 if ($this->qq_bind_mode) {
-                    //绑定模式
                     if (UserModel::where('qq_open_id', $openid)->field('id,qq_open_id')->find()) {
                         return View::fetch('/qq_login_error');
                     }
-                    //如果openid数据库不存在说明QQ没有被绑定过，可以绑定
-                    $this->BindQQ($openid); //绑定后需要替换Token，不然之前的QQ登录会失效
+                    $this->BindQQ($openid);
                 }
                 $info = UserModel::where('qq_open_id', $openid)->find();
-                if (!$info) { //不存在就创建一个新用户,如果上一个步骤绑定成功的话，是不可能进入此步骤的
-                    UserModel::insert(['mail' => null, 'password' => md5(time()), 'create_time' => date('Y-m-d H:i:s'), 'register_ip' => getRealIp(), 'qq_open_id' => $openid, 'group_id' => $this->getDefaultUserGroupId()]);
+                if (!$info) {
+                    // 使用雪花ID创建用户
+                    UserModel::create([
+                        'id' => UserModel::getSnowflakeId(),
+                        'mail' => null,
+                        'password' => md5(time()),
+                        'create_time' => date('Y-m-d H:i:s'),
+                        'register_ip' => getRealIp(),
+                        'qq_open_id' => $openid,
+                        'group_id' => $this->getDefaultUserGroupId(),
+                    ]);
                     $info = UserModel::where('qq_open_id', $openid)->find();
-                    $this->getUserOpenInfo($access_token, $openid); //获取一些用户的默认信息
+                    $this->getUserOpenInfo($access_token, $openid);
                 }
-                if ($info) { //如果用户存在
+                if ($info) {
                     $info->login_ip = getRealIp();
                     $info->login_time = date('Y-m-d H:i:s');
-                    $info->login_fail_count = 0; //登陆成功将失败次数归零
+                    $info->login_fail_count = 0;
                     $info->save();
                     $info['access_token'] = $access_token;
                     $auth = $this->refreshToken($info);
@@ -417,8 +435,14 @@ class User extends BaseController
                 $model = UserGroupModel::find($id);
                 $model->update($form);
             } else {
-                $model = new UserGroupModel();
-                $model->insert($form);
+                // 使用雪花ID创建分组
+                UserGroupModel::create([
+                    'id' => UserGroupModel::getSnowflakeId(),
+                    'name' => $form['name'] ?? '',
+                    'sort' => $form['sort'] ?? 0,
+                    'create_time' => date('Y-m-d H:i:s'),
+                ]);
+                $id = $model ? $model->id : 0;
             }
             $defUserGroup = $this->request->post('info.default_user_group', 0);
             if ($defUserGroup) {
@@ -477,7 +501,6 @@ class User extends BaseController
                     } else {
                         $userInfo = null;
                         if ($mode === 'bind') {
-                            //绑定模式
                             if ($user_id && $token && $auth = TokenModel::where('user_id', $user_id)->where('token', $token)->find()) {
                                 $info = UserModel::find($auth->user_id);
                                 if ($info) {
@@ -494,14 +517,22 @@ class User extends BaseController
                             $openid = $js["openid"];
                             $getUSerInfo = $this->getWxInfo($accessToken, $openid);
                             if ($getUSerInfo) {
-                                $table = ['mail' => null, 'password' => md5(time()), 'create_time' => date('Y-m-d H:i:s'), 'login_ip' => getRealIp(), 'register_ip' => getRealIp(), 'wx_open_id' => $js['openid'], 'wx_unionid' => $js['unionid']];
+                                $table = [
+                                    'id' => UserModel::getSnowflakeId(),
+                                    'mail' => null,
+                                    'password' => md5(time()),
+                                    'create_time' => date('Y-m-d H:i:s'),
+                                    'login_ip' => getRealIp(),
+                                    'register_ip' => getRealIp(),
+                                    'wx_open_id' => $js['openid'],
+                                    'wx_unionid' => $js['unionid'],
+                                    'group_id' => $this->getDefaultUserGroupId(),
+                                ];
                                 if ($getUSerInfo['headimgurl']) {
                                     $table['avatar'] = $this->downloadFile($getUSerInfo['headimgurl']);
                                 }
                                 $table['nickname'] = $getUSerInfo['nickname'];
-                                $table['group_id'] = $this->getDefaultUserGroupId();
-                                //非绑定模式下则创建用户
-                                UserModel::insert($table);
+                                UserModel::create($table);
                                 $info = UserModel::where('wx_open_id', $js['openid'])->find();
                             } else {
                                 Cache::set($state, ['type' => 'wx_login', 'status' => 2, 'msg' => '获取用户信息失败']);
@@ -519,7 +550,6 @@ class User extends BaseController
         return "";
     }
 
-    //根据access_token获取用户的一些基本信息
     private function getWxInfo($access_token, $openid)
     {
         $api = "https://api.weixin.qq.com/sns/userinfo?access_token={$access_token}&openid={$openid}";
@@ -528,7 +558,6 @@ class User extends BaseController
             if ($result->getStatusCode() == 200) {
                 $content = $result->getBody()->getContents();
                 $js = \Axios::toJson($content);
-                //检查$js是否包含openid
                 if (!isset($js['openid'])) {
                     return false;
                 }
@@ -577,12 +606,12 @@ class User extends BaseController
                     'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                 ]
             ]);
-            $ext = getFileExtByContent($downloadPath);//返回文件结尾扩展列入png
+            $ext = getFileExtByContent($downloadPath);
             $newName = $remotePath . md5($url) . "." . $ext;
             if (file_exists($downloadPath)) {
                 rename($downloadPath, $newName);
             }
-            return FileModel::addFile($path . $filename . "." . $ext);//添加到文件记录
+            return FileModel::addFile($path . $filename . "." . $ext);
         } catch (GuzzleException $e) {
             Log::error($e->getMessage());
         }

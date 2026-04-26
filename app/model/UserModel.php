@@ -1,11 +1,23 @@
 <?php
 namespace app\model;
+
+use app\extend\SnowFlake;
 use think\Model;
 
 class UserModel extends Model
 {
     protected $name = "user";
     protected $pk = "id";
+    
+    /**
+     * 获取雪花ID
+     * @return int
+     */
+    public static function getSnowflakeId(): int
+    {
+        return SnowFlake::getInstance(17)->nextId();
+    }
+    
     // 设置字段信息
     protected static $user_temp = null;
 
@@ -39,10 +51,10 @@ class UserModel extends Model
                 $status = self::where('id', $user['user_id'])->find();
                 if ($status && $status['status'] === 0) {
                     $user['group_id'] = $status['group_id'];
-                    if (time() > ($user['create_time'] + 60 * 60 * 24 * 15)) {//如果创建时间大于15天则删除
+                    if (time() > ($user['create_time'] + 60 * 60 * 24 * 15)) {
                         $user->delete();
                     } else {
-                        if ((time() - $user['create_time']) > (864000)) { //token定时15天清理一次，10-15天内如果使用了则重新计算时间
+                        if ((time() - $user['create_time']) > (864000)) {
                             $user->create_time = time();
                             $user->save();
                         }

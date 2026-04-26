@@ -1,73 +1,106 @@
-# mTab新标签页
+# mTab - 浏览器新标签页 (Hugging Face Spaces)
 
-![logo](https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/192.png)
+一个美观实用的浏览器新标签页/书签管理器，支持多种功能扩展。
 
-### [mTab书签官网](https://mtab.cc) | [安装文档](https://mtab.cc/document.html)  | [作者Blog](https://blog.mcecy.com) | QQ群：694155153
+## 🚀 一键部署到 Hugging Face Spaces
 
-![](https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/1.png?x-image-process=image/resize,m_lfit,w_900)
+### 1. Fork 本项目到你的 GitHub 仓库
 
+### 2. 在 Hugging Face Spaces 创建新 Space
 
-### 主要有以下特点
+访问 [Hugging Face Spaces](https://huggingface.co/new-space)，选择：
+- **SDK**: Docker
+- **Hardware**: 选择合适的硬件配置
 
-跨设备同步：不再为了在不同设备上找不到书签或笔记而苦恼。Mtab书签让你的收藏网址和重要笔记在所有设备上同步。
+### 3. 连接 TiDB Cloud 数据库
 
-跨浏览器支持：Mtab书签支持所有主流浏览器。Chrome、Firefox、Edge、Safari，无论你的选择是什么，都能在一应俱全的工具箱中找到你的书签和笔记。
+在 Hugging Face Spaces 的 Settings 中添加以下环境变量：
 
-多功能一体：Mtab书签不仅仅是一个书签工具，它还提供了一个实用的记事本功能，让你随时随地记录想法、灵感和待办事项。此外，它还内置了一些在线小工具，解决您的日常工作问题。
+| 环境变量名 | 说明 | 示例 |
+|-----------|------|------|
+| `TIDB_HOST` | TiDB 主机地址 | `xxx.tidbcloud.com` |
+| `TIDB_PORT` | TiDB 端口 | `4000` |
+| `TIDB_USER` | TiDB 用户名 | `username` |
+| `TIDB_PASSWORD` | TiDB 密码 | `password` |
+| `TIDB_DATABASE` | 数据库名称 | `mtab` |
+| `ADMIN_USER` | 管理员账号(可选) | `admin` |
+| `ADMIN_PASSWORD` | 管理员密码(可选) | `123456` |
 
-私有部署：如果部你对数据安全性有更高要求，Mtab书签也支持私有部署。你可以将它部署在自己的服务器上，完全掌控你的数据，不受任何干扰。
+### 4. 获取 TiDB 连接信息
 
-免费无广告：Mtab书签坚守“免费无广告”的原则，为用户提供清爽的使用体验，没有任何干扰。
+1. 登录 [TiDB Cloud](https://tidbcloud.com/)
+2. 创建一个 Serverless Tier 集群（免费）
+3. 在连接信息中找到主机地址、端口、用户名和密码
 
-Mtab书签的界面设计美观简洁，操作简单直观，让你可以专注于你的网络活动，而不是应用本身。它是你高效、无忧的网络生活的理想伴侣。
-高效流畅的操作体验：超级简约却强大的操作逻辑，没有繁琐的操作流程即可处理复杂的事情。
+## 📋 TiDB 兼容性说明
 
-## Demo演示站
+本项目已针对 TiDB 进行优化适配：
 
-#### **[演示站Demo入口](https://demo.mtab.cc)**
+### ✅ 已实现的功能
 
-演示账号：admin
+1. **SSL 连接支持**
+   - TiDB Cloud 强制要求 SSL 连接
+   - 配置文件中已启用 `MYSQL_ATTR_SSL_CA`
+   - 使用系统证书池 `/etc/ssl/certs/ca-certificates.crt`
 
-演示密码：123456
+2. **雪花ID算法**
+   - TiDB 的 AUTO_INCREMENT 在多并发下不是严格递增的
+   - 使用雪花算法生成严格递增的分布式 ID
+   - 所有数据表主键使用 `BIGINT` + 雪花算法
 
+3. **事务优化**
+   - TiDB 对事务大小有限制
+   - SQL 执行采用分批次提交（每50条提交一次）
 
-## Docker部署方式
+4. **字符集统一**
+   - 所有表使用 `utf8mb4` 字符集
+   - 统一使用 `utf8mb4_general_ci` 排序规则
 
-镜像： itushan/mtab
+5. **移除外键约束**
+   - TiDB 语法上支持外键但默认不生效
+   - 数据完整性逻辑在应用层实现
 
-视频教程： https://www.bilibili.com/video/BV1ee411B7fY/
+### 🔧 配置参数说明
 
-部署命令： docker run -itd --name mtab -p 9200:80 -v /opt/mtab:/app itushan/mtab
-
-命令解释： 其中 9200 可改为你服务器的其他端口。 /opt/mtab 可改为是你服务器的目录挂载路径，容器内目录和端口必须是 80 和 /app，--name为自定义容器名称。
-
-可视化部署： 群晖等其他管理面板请拉取 itushan/mtab 镜像。服务器端口请自己填写，容器请填写 80 ，服务器目录请填写自己想挂载的目录，容器部分请填写 /app。
-
-程序数据库安装： 部署完docker后访问您设置的端口，然后填写一些数据库配置后点击 安装 按钮即可等待安装完成， 注意的是容器部署下数据库地址请不要填写127.0.0.1,因为容器内127.0.0.1不指向宿主机网络。
-
-最后事项： 最后如果要使用外网访问，为了安全请使用Nginx反向代理或者CDN来代理您创建时填写的端口，并且配置SSL证书启用HTTPS，纯内网环境请随意啦。
-
-### docker-compose.yml
-
-在你想安装的目录创建docker-compose.yml，然后安装的目录执行`docker-compose  up -d `即可
-
-```yml
-version: '3'
-services:
-  mtabServer:
-    image: itushan/mtab
-    container_name: mtabServer
-    user: "${USER_ID}:${GROUP_ID}"
-    ports:
-      - "9200:80"
-    volumes:
-      - ./:/app
-    restart: always
+```yaml
+# .env 配置示例
+DATABASE:
+  TYPE: mysql
+  HOSTNAME: your-tidb-host.tidbcloud.com
+  DATABASE: mtab
+  USERNAME: your-username
+  PASSWORD: your-password
+  HOSTPORT: 4000
+  CHARSET: utf8mb4
 ```
-## 预览图
 
-![](https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/1.png)
-<img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/2.png" width="50%"><img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/3.png" width="50%">
-<img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/4.png" width="33.3%"><img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/5.png" width="33.3%"><img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/6.png" width="33.3%">
-<img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/8.png" width="50%"><img src="https://raw.githubusercontent.com/tsxcw/imagesHouse/itushan/mTabReadme/7.png" width="50%">
+## 🐳 本地开发
 
+```bash
+# 构建 Docker 镜像
+docker build -t mtab .
+
+# 运行容器
+docker run -d -p 7860:7860 \
+  -e TIDB_HOST=your-host \
+  -e TIDB_PORT=4000 \
+  -e TIDB_USER=your-user \
+  -e TIDB_PASSWORD=your-password \
+  -e TIDB_DATABASE=mtab \
+  mtab
+```
+
+## 📦 功能特性
+
+- 🔖 书签管理 - 跨设备同步、文件夹分类
+- 📝 笔记功能 - 快捷记录灵感
+- 🌤️ 天气卡片 - 实时天气信息
+- 🔍 聚合搜索 - 百度、B站、微博等热搜
+- 📅 日历/倒计时/纪念日
+- 🤖 AI 助手 - 智能对话
+- 🎨 壁纸系统 - 自定义背景
+- 📱 适配移动端
+
+## 📄 许可证
+
+MIT License

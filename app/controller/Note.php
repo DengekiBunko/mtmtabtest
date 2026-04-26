@@ -5,7 +5,7 @@ namespace app\controller;
 
 
 use app\BaseController;
-use think\facade\View;
+use app\model\NoteModel;
 
 class Note extends BaseController
 {
@@ -17,7 +17,7 @@ class Note extends BaseController
         if (!$user) {
             return $this->success('', []);
         }
-        $data = (new \app\model\NoteModel)->where("user_id", $user['user_id'])->field('user_id,id,title,create_time,update_time,weight,sort')->order(['sort' => 'asc', 'create_time' => 'desc'])->limit($limit)->select();
+        $data = NoteModel::where("user_id", $user['user_id'])->field('user_id,id,title,create_time,update_time,weight,sort')->order(['sort' => 'asc', 'create_time' => 'desc'])->limit($limit)->select();
         return $this->success('ok', $data);
     }
 
@@ -25,7 +25,7 @@ class Note extends BaseController
     {
         $user = $this->getUser(true);
         $ids = $this->request->post('ids', []);
-        $data = (new \app\model\NoteModel)->field("id,user_id,sort")->where("user_id", $user['user_id'])->whereIn('id', $ids)->select()->toArray();
+        $data = NoteModel::field("id,user_id,sort")->where("user_id", $user['user_id'])->whereIn('id', $ids)->select()->toArray();
         //查询到和id做个比对重新设置sort入库，批量入库，
         $data_map = [];
         foreach ($data as $k => $v) {
@@ -41,7 +41,10 @@ class Note extends BaseController
             }
         }
         try {
-            (new \app\model\NoteModel)->saveAll($update_data);
+            // TiDB兼容性: 使用单条更新而非批量saveAll
+            foreach ($update_data as $item) {
+                NoteModel::where('id', $item['id'])->update(['sort' => $item['sort']]);
+            }
         } catch (\Exception $e) {
             return $this->error('排序失败');
         }
@@ -54,7 +57,7 @@ class Note extends BaseController
     {
         $user = $this->getUser(true);
         $id = $this->request->get('id');
-        $data = (new \app\model\NoteModel)->where("user_id", $user['user_id'])->field("text,id")->where('id', $id)->find();
+        $data = NoteModel::where("user_id", $user['user_id'])->field("text,id")->where('id', $id)->find();
         return response($data['text']);
     }
 
@@ -68,7 +71,7 @@ class Note extends BaseController
                 'weight' => $weight,
                 'update_time' => date('Y-m-d H:i:s'),
             );
-            (new \app\model\NoteModel)->where('id', $id)->where('user_id', $user['user_id'])->update($data);
+            NoteModel::where('id', $id)->where('user_id', $user['user_id'])->update($data);
         }
         return $this->success("ok");
     }
@@ -78,7 +81,7 @@ class Note extends BaseController
     {
         $user = $this->getUser(true);
         $id = $this->request->get('id');
-        $data = (new \app\model\NoteModel)->where("user_id", $user['user_id'])->where('id', $id)->delete();
+        $data = NoteModel::where("user_id", $user['user_id'])->where('id', $id)->delete();
         return $this->success('删除成功', $data);
     }
 
@@ -92,7 +95,9 @@ class Note extends BaseController
         if ($id != '') {
             return $this->update();
         }
+        // 使用雪花ID创建笔记
         $data = array(
+            "id" => \app\model\NoteModel::getSnowflakeId(),
             "user_id" => $user['user_id'],
             "text" => $text,
             "title" => $title,
@@ -124,7 +129,7 @@ class Note extends BaseController
             'weight' => $this->request->post('weight', 0),
             "update_time" => date("Y-m-d H:i:s"),
         );
-        $status = (new \app\model\NoteModel)->where("id", $id)->where('user_id', $user['user_id'])->find()->save($data);
+        $status = NoteModel::where("id", $id)->where('user_id', $user['user_id'])->update($data);
         if ($status) {
             $data['id'] = $id;
             return $this->success("修改", $data);

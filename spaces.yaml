@@ -1,0 +1,27 @@
+# Hugging Face Spaces 配置
+# 用于自动配置应用程序
+
+# 应用端口 (Hugging Face Spaces 默认 7860)
+HF_SPACE: true
+
+# 数据库配置 (TiDB Cloud)
+TIDB_HOST: ${TIDB_HOST}
+TIDB_PORT: ${TIDB_PORT:-4000}
+TIDB_USER: ${TIDB_USER}
+TIDB_PASSWORD: ${TIDB_PASSWORD}
+TIDB_DATABASE: ${TIDB_DATABASE:-mtab}
+
+# 兼容旧版环境变量
+MYSQL_HOST: ${TIDB_HOST}
+MYSQL_PORT: ${TIDB_PORT:-4000}
+MYSQL_USER: ${TIDB_USER}
+MYSQL_PASSWORD: ${TIDB_PASSWORD}
+MYSQL_DATABASE: ${TIDB_DATABASE:-mtab}
+
+# 管理员配置
+ADMIN_USER: ${ADMIN_USER:-admin}
+ADMIN_PASSWORD: ${ADMIN_PASSWORD:-123456}
+
+# 应用配置
+APP_DEBUG: false
+APP_ENV: production
