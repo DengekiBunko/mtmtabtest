@@ -99,7 +99,7 @@ while true; do
     
     # 检查进程状态
     if command -v pgrep &> /dev/null; then
-        if ! pgrep -x "php-fpm" > /dev/null 2>&1; then
+        if ! pgrep -f "php-fpm" > /dev/null 2>&1; then
             echo "Warning: PHP-FPM not running, restarting..."
             (php-fpm8.2 || php-fpm8.3 || php-fpm) &
         fi
@@ -110,11 +110,10 @@ while true; do
         fi
     fi
     
-    # 检查证书是否需要更新（每小时检查一次）
+    # 检查证书是否需要更新
     DB_SSL_CA_PEM="${DB_SSL_CA_PEM:-}"
-    if [ -n "$DB_SSL_CA_PEM" ] && [ -f "/app/runtime/tidb_ca.pem" ]; then
-        CURRENT_CERT=$(cat /app/runtime/tidb_ca.pem 2>/dev/null || echo "")
-        if [ "$CURRENT_CERT" != "$DB_SSL_CA_PEM" ]; then
+    if [ -n "$DB_SSL_CA_PEM" ]; then
+        if ! (echo "$DB_SSL_CA_PEM" | diff -q /app/runtime/tidb_ca.pem - > /dev/null 2>&1); then
             echo "检测到SSL证书更新，正在更新..."
             echo "$DB_SSL_CA_PEM" > /app/runtime/tidb_ca.pem
             echo "SSL证书已更新"

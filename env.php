@@ -38,32 +38,17 @@ $status = false;
 $install_lock_file = '/app/public/installed.lock';
 $env_file = '/app/.env';
 
-// 如果已安装，直接更新.env配置（secrets可能已更新）
-if (file_exists($install_lock_file)) {
-    print_r("检测到已安装配置，正在检查数据库连接...\n");
-    
-    if ($TIDB_HOST && $TIDB_USER) {
-        // 更新.env配置
-        $env = generateEnvContent($TIDB_HOST, $TIDB_PORT, $TIDB_USER, $TIDB_PASSWORD, $TIDB_DATABASE, $DB_SSL_CA_PEM);
-        file_put_contents($env_file, $env);
-        print_r(".env配置文件已更新\n");
-    }
-    
-    // 检查数据库连接
-    if (testDbConnection($TIDB_HOST, $TIDB_PORT, $TIDB_USER, $TIDB_PASSWORD, $TIDB_DATABASE, $DB_SSL_CA_PEM)) {
-        print_r("数据库连接正常\n");
-    } else {
-        print_r("警告: 数据库连接失败，请检查secrets配置\n");
-    }
-    
-    print_r("初始化完成 - 跳过安装页面\n");
-    print_r("========================================\n");
-    exit(0);
+// 无论是否安装，先更新.env配置（secrets可能已更新）
+if ($TIDB_HOST && $TIDB_USER) {
+    // 更新.env配置
+    $env = generateEnvContent($TIDB_HOST, $TIDB_PORT, $TIDB_USER, $TIDB_PASSWORD, $TIDB_DATABASE, $DB_SSL_CA_PEM);
+    file_put_contents($env_file, $env);
+    print_r(".env配置文件已同步\n");
 }
 
-// 执行全新安装
+// 检查数据库连接并同步配置
 if ($TIDB_HOST && $TIDB_USER && $TIDB_PASSWORD && $TIDB_DATABASE) {
-    print_r("检测到数据库配置，开始自动安装...\n");
+    print_r("检测到数据库配置，正在同步配置...\n");
     print_r("数据库主机: $TIDB_HOST:$TIDB_PORT\n");
     print_r("数据库名称: $TIDB_DATABASE\n");
     print_r("========================================\n");
@@ -79,7 +64,6 @@ if ($TIDB_HOST && $TIDB_USER && $TIDB_PASSWORD && $TIDB_DATABASE) {
         if ($conn->query($sql) !== TRUE) {
             print_r("数据库创建提示: " . $conn->error . "\n");
         }
-        print_r("数据库创建完毕\n");
         $conn->close();
         
         // 重新连接数据库
@@ -87,40 +71,50 @@ if ($TIDB_HOST && $TIDB_USER && $TIDB_PASSWORD && $TIDB_DATABASE) {
         
         if ($conn && !$conn->connect_error) {
             $conn->set_charset('utf8mb4');
-            print_r("执行建表SQL...\n");
             
-            // 执行install.sql
-            $sql_file_content = file_get_contents('/app/install.sql');
-            $sql_statements = explode(';', trim($sql_file_content));
-            
-            foreach ($sql_statements as $sql_statement) {
-                $sql_statement = trim($sql_statement);
-                if (!empty($sql_statement) && !preg_match('/^--/', $sql_statement)) {
-                    try {
-                        $conn->query($sql_statement);
-                    } catch (\Exception $e) {
-                        // 忽略已存在的表/字段错误
+            // 检查是否需要执行安装
+            if (!file_exists($install_lock_file)) {
+                print_r("未检测到安装锁，执行建表SQL...\n");
+                
+                // 执行install.sql
+                $sql_file_content = file_get_contents('/app/install.sql');
+                $sql_statements = explode(';', trim($sql_file_content));
+                
+                foreach ($sql_statements as $sql_statement) {
+                    $sql_statement = trim($sql_statement);
+                    if (!empty($sql_statement) && !preg_match('/^--/', $sql_statement)) {
+                        try {
+                            $conn->query($sql_statement);
+                        } catch (\Exception $e) {
+                            // 忽略已存在的表/字段错误
+                        }
                     }
                 }
-            }
-            print_r("数据表创建完毕\n");
-            
-            // 插入默认数据
-            $sql_file_content = file_get_contents('/app/defaultData.sql');
-            $sql_statements = explode(';', trim($sql_file_content));
-            foreach ($sql_statements as $sql_statement) {
-                $sql_statement = trim($sql_statement);
-                if (!empty($sql_statement) && !preg_match('/^--/', $sql_statement)) {
-                    try {
-                        $conn->query($sql_statement);
-                    } catch (\Exception $e) {
-                        // 忽略重复插入错误
+                print_r("数据表创建完毕\n");
+                
+                // 插入默认数据
+                $sql_file_content = file_get_contents('/app/defaultData.sql');
+                $sql_statements = explode(';', trim($sql_file_content));
+                foreach ($sql_statements as $sql_statement) {
+                    $sql_statement = trim($sql_statement);
+                    if (!empty($sql_statement) && !preg_match('/^--/', $sql_statement)) {
+                        try {
+                            $conn->query($sql_statement);
+                        } catch (\Exception $e) {
+                            // 忽略重复插入错误
+                        }
                     }
                 }
+                print_r("默认数据插入完毕\n");
+                
+                // 创建安装锁定文件
+                file_put_contents($install_lock_file, 'installed');
+                print_r("安装锁定文件已创建\n");
+            } else {
+                print_r("检测到已安装，跳过建表步骤\n");
             }
-            print_r("默认数据插入完毕\n");
             
-            // 创建管理员账号
+            // 同步管理员账号 (无论是否新安装)
             $admin_password = md5($ADMIN_PASSWORD);
             $checkAdmin = "SELECT id FROM user WHERE mail = '" . $conn->real_escape_string($ADMIN_USER) . "'";
             $adminExists = $conn->query($checkAdmin);
@@ -137,10 +131,17 @@ if ($TIDB_HOST && $TIDB_USER && $TIDB_PASSWORD && $TIDB_DATABASE) {
                     print_r("管理员创建提示: " . $e->getMessage() . "\n");
                 }
             } else {
-                print_r("管理员账号已存在\n");
+                // 同步密码
+                $updateSql = "UPDATE user SET password = '$admin_password' WHERE mail = '" . $conn->real_escape_string($ADMIN_USER) . "'";
+                try {
+                    $conn->query($updateSql);
+                    print_r("管理员账号密码已同步: $ADMIN_USER\n");
+                } catch (\Exception $e) {
+                    print_r("管理员密码同步失败: " . $e->getMessage() . "\n");
+                }
             }
             
-            // 创建用户分组
+            // 创建用户分组 (始终确保存在)
             $checkGroup = "SELECT id FROM user_group WHERE default_user_group = 1";
             $groupExists = $conn->query($checkGroup);
             if (!$groupExists || $groupExists->num_rows == 0) {
@@ -155,6 +156,7 @@ if ($TIDB_HOST && $TIDB_USER && $TIDB_PASSWORD && $TIDB_DATABASE) {
             }
             
             $conn->close();
+            $status = true;
         } else {
             print_r("连接数据库失败: " . ($conn ? $conn->connect_error : "未知错误") . "\n");
         }
@@ -162,30 +164,12 @@ if ($TIDB_HOST && $TIDB_USER && $TIDB_PASSWORD && $TIDB_DATABASE) {
         print_r("连接数据库失败: " . ($conn ? $conn->connect_error : "未知错误") . "\n");
     }
     
-    // 生成.env配置文件
-    $env = generateEnvContent($TIDB_HOST, $TIDB_PORT, $TIDB_USER, $TIDB_PASSWORD, $TIDB_DATABASE, $DB_SSL_CA_PEM);
-    file_put_contents($env_file, $env);
-    print_r(".env配置文件已生成\n");
-    
-    // 创建安装锁定文件
-    file_put_contents($install_lock_file, 'installed');
-    print_r("安装锁定文件已创建\n");
-    
-    $status = true;
     print_r("========================================\n");
-    print_r("安装完成!\n");
+    print_r("配置同步完成!\n");
     print_r("管理员账号: $ADMIN_USER\n");
-    print_r("管理员密码: $ADMIN_PASSWORD\n");
     print_r("========================================\n");
 } else {
-    print_r("未检测到数据库配置\n");
-    print_r("请在 HuggingFace Spaces Secrets 中设置以下环境变量:\n");
-    print_r("  - DB_HOST: TiDB主机地址\n");
-    print_r("  - DB_PORT: TiDB端口 (默认4000)\n");
-    print_r("  - DB_USER: 数据库用户名\n");
-    print_r("  - DB_PASSWORD: 数据库密码\n");
-    print_r("  - DB_NAME: 数据库名称\n");
-    print_r("========================================\n");
+    print_r("未检测到数据库配置，跳过自动同步\n");
 }
 
 print_r("初始化完成\n");
