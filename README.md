@@ -1,3 +1,13 @@
+---
+title: mTab
+emoji: 🔖
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # mTab - 浏览器新标签页 (Hugging Face Spaces)
 
 一个美观实用的浏览器新标签页/书签管理器，支持多种功能扩展。
